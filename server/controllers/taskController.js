@@ -3,14 +3,21 @@ import Task from '../models/Task.js';
 
 export const getTasks = async (req, res) => {
   try {
-    const { status } = req.query;
-    const filter = { userId: req.user._id };
+    const { status, sortBy = 'createdAt', order = 'desc' } = req.query;
 
-    if (status && (status === 'pending' || status === 'in-progress' || status === 'done')) {
+    // Build filter — always scoped to the logged-in user
+    const filter = { userId: req.user._id };
+    const validStatuses = ['pending', 'in-progress', 'done'];
+    if (status && validStatuses.includes(status)) {
       filter.status = status;
     }
 
-    const tasks = await Task.find(filter).sort({ createdAt: -1 });
+    // Build sort — allow sorting by dueDate or createdAt
+    const validSortFields = ['dueDate', 'createdAt'];
+    const sortField = validSortFields.includes(sortBy) ? sortBy : 'createdAt';
+    const sortDirection = order === 'asc' ? 1 : -1;
+
+    const tasks = await Task.find(filter).sort({ [sortField]: sortDirection });
     res.json({ tasks });
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch tasks' });
