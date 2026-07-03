@@ -1,7 +1,38 @@
-import React, { useState, useEffect, useRef } from 'react';
+import  { useState, useEffect, useRef } from 'react';
 
 // ─── Lightweight Markdown Renderer ─────────────────────────────────────────────
-// Supports: **bold**, `code`, # headers, bullet lists (- / *), numbered lists
+// Supports: **bold**, `code`, # headers, tables, bullet lists (- / *), numbered lists
+const renderTable = (tableLines, key) => {
+  const rows = tableLines.map((row) => row.replace(/^\||\|$/g, '').split('|').map((cell) => cell.trim()));
+  const header = rows[0] || [];
+  const body = rows.slice(2);
+
+  return (
+    <table key={`table-${key}`} style={{ borderCollapse: 'collapse', width: '100%', margin: '10px 0' }}>
+      <thead>
+        <tr>
+          {header.map((cell, idx) => (
+            <th key={idx} style={{ border: '1px solid var(--border-color)', padding: '10px 12px', textAlign: 'left', background: 'var(--bg-app)', fontWeight: 700 }}>
+              {renderInline(cell)}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {body.map((row, rowIndex) => (
+          <tr key={rowIndex}>
+            {row.map((cell, cellIndex) => (
+              <td key={cellIndex} style={{ border: '1px solid var(--border-color)', padding: '10px 12px' }}>
+                {renderInline(cell)}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+};
+
 const renderMarkdown = (text) => {
   if (!text) return null;
 
@@ -10,6 +41,14 @@ const renderMarkdown = (text) => {
   let listBuffer = [];
   let listType = null; // 'ul' | 'ol'
 
+  const parseListItem = (raw) => {
+    const checkboxMatch = raw.match(/^\s*\[( |x|X)\]\s+(.+)$/);
+    if (checkboxMatch) {
+      return { text: checkboxMatch[2], checked: checkboxMatch[1].toLowerCase() === 'x' };
+    }
+    return { text: raw, checked: null };
+  };
+
   const flushList = (key) => {
     if (listBuffer.length === 0) return;
     const Tag = listType === 'ol' ? 'ol' : 'ul';
@@ -17,7 +56,19 @@ const renderMarkdown = (text) => {
       <Tag key={`list-${key}`} style={{ paddingLeft: '20px', margin: '6px 0' }}>
         {listBuffer.map((item, i) => (
           <li key={i} style={{ marginBottom: '4px', lineHeight: 1.5 }}>
-            {renderInline(item)}
+            {item.checked === null ? (
+              renderInline(item.text)
+            ) : (
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={item.checked}
+                  readOnly
+                  style={{ width: '16px', height: '16px', margin: 0, accentColor: 'var(--primary)' }}
+                />
+                <span>{renderInline(item.text)}</span>
+              </label>
+            )}
           </li>
         ))}
       </Tag>
@@ -26,7 +77,9 @@ const renderMarkdown = (text) => {
     listType = null;
   };
 
-  lines.forEach((line, i) => {
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    const nextLine = lines[i + 1];
     // Headings
     const h1 = line.match(/^#\s+(.+)/);
     const h2 = line.match(/^##\s+(.+)/);
@@ -37,8 +90,20 @@ const renderMarkdown = (text) => {
     const ol = line.match(/^\d+\.\s+(.+)/);
     // Horizontal rule
     const hr = line.match(/^---+$/);
+    // Table header separator line (e.g. |---|---| or ---|---)
+    const tableSeparator = nextLine && /^\s*\|?\s*[:\-]+(?:\s*\|\s*[:\-]+)+\s*\|?\s*$/.test(nextLine);
 
-    if (h3) {
+    if (tableSeparator) {
+      flushList(i);
+      const tableLines = [line, nextLine];
+      let j = i + 2;
+      while (j < lines.length && lines[j].trim() !== '' && lines[j].includes('|')) {
+        tableLines.push(lines[j]);
+        j += 1;
+      }
+      elements.push(renderTable(tableLines, i));
+      i = j - 1;
+    } else if (h3) {
       flushList(i);
       elements.push(<h3 key={i} style={{ fontSize: '13px', fontWeight: 700, margin: '10px 0 4px', color: 'var(--text-primary)' }}>{renderInline(h3[1])}</h3>);
     } else if (h2) {
@@ -50,11 +115,11 @@ const renderMarkdown = (text) => {
     } else if (ul) {
       if (listType === 'ol') flushList(i);
       listType = 'ul';
-      listBuffer.push(ul[1]);
+      listBuffer.push(parseListItem(ul[1]));
     } else if (ol) {
       if (listType === 'ul') flushList(i);
       listType = 'ol';
-      listBuffer.push(ol[1]);
+      listBuffer.push(parseListItem(ol[1]));
     } else if (hr) {
       flushList(i);
       elements.push(<hr key={i} style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '8px 0' }} />);
@@ -65,7 +130,7 @@ const renderMarkdown = (text) => {
       flushList(i);
       elements.push(<p key={i} style={{ margin: '3px 0', lineHeight: 1.55 }}>{renderInline(line)}</p>);
     }
-  });
+  }
 
   flushList('end');
   return elements;
@@ -236,6 +301,7 @@ const ChatBox = () => {
 
   return (
     <>
+
       <style>{`
         /* ── FAB button ── */
         .chatbot-fab {

@@ -1,5 +1,7 @@
 import OpenAI from "openai";
 
+const SYSTEM_PROMPT = "You are a helpful assistant that only answers questions about productivity, task management, and time management. If asked about anything unrelated, politely redirect the user back to those topics.";
+
 export const chatBasic = async (req, res) => {
   try {
     const { messages } = req.body || {};
@@ -8,14 +10,19 @@ export const chatBasic = async (req, res) => {
       return res.status(400).json({ error: "messages array is required" });
     }
 
+    const mergedMessages = [
+      { role: "system", content: SYSTEM_PROMPT },
+      ...messages,
+    ];
+
     const client = new OpenAI({
-      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
-      apiKey: process.env.GEMINI_API_KEY,
+      baseURL: process.env.AI_BASE_URL?.trim(),
+      apiKey: process.env.AI_API_KEY?.trim(),
     });
 
     const response = await client.chat.completions.create({
-      model: "gemini-2.5-flash",
-      messages: messages,
+      model: process.env.AI_MODEL?.trim(),
+      messages: mergedMessages,
     });
 
     const reply = response.choices[0]?.message?.content || "";
@@ -34,16 +41,21 @@ export const chatStream = async (req, res) => {
       return res.status(400).json({ error: "messages array is required" });
     }
 
+    const mergedMessages = [
+      { role: "system", content: SYSTEM_PROMPT },
+      ...messages,
+    ];
+
     const client = new OpenAI({
-      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
-      apiKey: process.env.GEMINI_API_KEY,
+      baseURL: process.env.AI_BASE_URL?.trim(),
+      apiKey: process.env.AI_API_KEY?.trim(),
     });
 
     // ⚠️  Call the API BEFORE setting SSE headers so that errors like 429
     // can still be returned as proper JSON HTTP responses (not empty streams).
     const stream = await client.chat.completions.create({
-      model: "gemini-2.5-flash",
-      messages: messages,
+      model: process.env.AI_MODEL?.trim(),
+      messages: mergedMessages,
       stream: true,
     });
 
@@ -64,17 +76,18 @@ export const chatStream = async (req, res) => {
   } catch (error) {
     console.error("AI Stream Request Failed Error:", error);
 
+    const status = error?.status === 429 ? 429 : (error?.status || 500);
+    const message = error?.status === 429
+      ? "Rate limit reached. Please wait a moment and try again."
+      : error?.message || "AI request failed";
+
     if (!res.headersSent) {
       // Headers not sent yet → we can still return a proper HTTP error
-      const status  = error.status === 429 ? 429 : 500;
-      const message = error.status === 429
-        ? "Rate limit reached. Please wait a moment and try again."
-        : "AI request failed";
       return res.status(status).json({ error: message });
     }
 
     // Headers already sent (mid-stream error) → send SSE error event then close
-    res.write(`data: ${JSON.stringify({ error: "Stream interrupted" })}\n\n`);
+    res.write(`data: ${JSON.stringify({ error: message })}\n\n`);
     res.end();
   }
 };
