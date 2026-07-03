@@ -70,6 +70,25 @@ cp client/.env.example client/.env
 
 ---
 
+## AI Chat Assistant
+
+This project includes an AI-powered chat assistant built into the frontend. It uses the Express backend to proxy chat requests to an AI provider via environment-configured API credentials.
+
+- The chat assistant appears as an in-app task support widget.
+- It is designed to answer questions about productivity, task management, and time management.
+- Requests are streamed from the backend using Server-Sent Events (SSE) to show progressive assistant output.
+- Provider configuration is controlled entirely through server environment variables, so switching providers only requires updating `server/.env`.
+
+Required server env vars for chat:
+
+| Variable | Required | Description |
+| :--- | :---: | :--- |
+| `AI_API_KEY` | ✅ | API key for the configured AI provider |
+| `AI_BASE_URL` | ✅ | Base URL for the provider’s OpenAI-compatible API endpoint |
+| `AI_MODEL` | ✅ | Model name to use for chat completions |
+
+---
+
 ## Running the Backend Locally
 
 Open a terminal and follow these steps:
