@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar';
 import TaskCard from '../components/TaskCard';
 import TaskModal from '../components/TaskModal';
 import ConfirmModal from '../components/ConfirmModal';
+import ChatBox from '../components/ChatBox';
 
 const Dashboard = () => {
   const [tasks, setTasks] = useState([]);
@@ -287,6 +288,9 @@ const Dashboard = () => {
         }}
         onConfirm={handleDeleteTask}
       />
+
+      {/* Chat Bot Assistant */}
+      <ChatBox />
 
       {/* Toast notifications portal */}
       <div className="toast-container">
