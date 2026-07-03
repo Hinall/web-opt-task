@@ -2,6 +2,9 @@
 
 A secure, full-stack Task Manager built with MongoDB Atlas, Express.js, React, and Node.js. Users can register an account, log in with JWT authentication, and manage personal tasks through a clean, warm editorial UI — with full Create, Read, Update, and Delete (CRUD) support. Every task is strictly scoped to its owner; no user can access another's data.
 
+frontend is deployed on vercel and backend on render
+
+demo:https://web-opt-task.vercel.app/
 ---
 
 ## Project Structure
