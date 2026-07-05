@@ -1,4 +1,5 @@
 import  { useState, useEffect, useRef } from 'react';
+import API from '../services/api';
 
 // ─── Lightweight Markdown Renderer ─────────────────────────────────────────────
 // Supports: **bold**, `code`, # headers, tables, bullet lists (- / *), numbered lists
@@ -214,37 +215,21 @@ const ChatBox = () => {
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/chat/tools', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ messages: updatedMessages }),
+      const { data } = await API.post('/api/chat/tools', {
+        messages: updatedMessages,
       });
-
-      if (!response.ok) {
-        const errorMessage = response.status === 401
-          ? 'Please log in again'
-          : 'Something went wrong';
-        setMessages((prev) => [
-          ...prev,
-          { role: 'assistant', content: errorMessage },
-        ]);
-        return;
-      }
-
-      const data = await response.json();
       setMessages((prev) => [
         ...prev,
         { role: 'assistant', content: data.reply },
       ]);
     } catch (error) {
       console.error('Chat tools error:', error);
+      const errorMessage = error.response?.status === 401
+        ? 'Please log in again'
+        : 'Something went wrong';
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: 'Something went wrong' },
+        { role: 'assistant', content: errorMessage },
       ]);
     } finally {
       setLoading(false);
