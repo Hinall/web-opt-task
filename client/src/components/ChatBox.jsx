@@ -214,86 +214,38 @@ const ChatBox = () => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/chat/stream', {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/chat/tools', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ messages: updatedMessages }),
       });
 
-      // If the server returned a real HTTP error (e.g. 429, 500)
-      // parse the JSON body for a meaningful message.
       if (!response.ok) {
-        let errMsg = 'Something went wrong. Please try again.';
-        try {
-          const errData = await response.json();
-          if (errData?.error) errMsg = errData.error;
-        } catch { /* ignore */ }
-        setMessages((prev) => [...prev, { role: 'assistant', content: errMsg }]);
+        const errorMessage = response.status === 401
+          ? 'Please log in again'
+          : 'Something went wrong';
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: errorMessage },
+        ]);
         return;
       }
 
-      const reader  = response.body.getReader();
-      const decoder = new TextDecoder();
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const raw   = decoder.decode(value, { stream: true });
-        const lines = raw.split('\n');
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const payload = line.slice('data: '.length).trim();
-
-          if (payload === '[DONE]') break;
-
-          try {
-            const parsed = JSON.parse(payload);
-
-            // Handle mid-stream error event from the server
-            if (parsed.error) {
-              setMessages((prev) => {
-                const last = prev[prev.length - 1];
-                // If an assistant bubble already exists, update it
-                if (last?.role === 'assistant') {
-                  const next = [...prev];
-                  next[next.length - 1] = { ...last, content: last.content + ' [Stream interrupted]' };
-                  return next;
-                }
-                return [...prev, { role: 'assistant', content: 'Stream interrupted. Please try again.' }];
-              });
-              break;
-            }
-
-            const { text } = parsed;
-            if (text) {
-              setMessages((prev) => {
-                const last = prev[prev.length - 1];
-                if (last?.role === 'assistant') {
-                  // Append to the existing in-progress assistant bubble
-                  const next = [...prev];
-                  next[next.length - 1] = { ...last, content: last.content + text };
-                  return next;
-                }
-                // First token — create the assistant bubble now
-                return [...prev, { role: 'assistant', content: text }];
-              });
-            }
-          } catch { /* ignore malformed JSON */ }
-        }
-      }
+      const data = await response.json();
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: data.reply },
+      ]);
     } catch (error) {
-      console.error('Chat stream error:', error);
-      setMessages((prev) => {
-        const last = prev[prev.length - 1];
-        if (last?.role === 'assistant') {
-          const next = [...prev];
-          next[next.length - 1] = { ...last, content: 'Something went wrong. Please try again.' };
-          return next;
-        }
-        return [...prev, { role: 'assistant', content: 'Something went wrong. Please try again.' }];
-      });
+      console.error('Chat tools error:', error);
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: 'Something went wrong' },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -751,7 +703,8 @@ const ChatBox = () => {
           ) : (
             messages.map((msg, index) => {
               const isUser = msg.role === 'user';
-              const isError = msg.content === 'Something went wrong. Please try again.';
+              const isError = msg.content === 'Please log in again'
+                || msg.content === 'Something went wrong';
               return (
                 <div key={index} className={`chat-msg-row ${isUser ? 'user' : 'assistant'}`}>
                   <div className="chat-msg-label">{isUser ? 'You' : 'Assistant'}</div>
@@ -773,6 +726,7 @@ const ChatBox = () => {
                 <div className="chat-dot" />
                 <div className="chat-dot" />
                 <div className="chat-dot" />
+                <span>AI is thinking...</span>
               </div>
             </div>
           )}
